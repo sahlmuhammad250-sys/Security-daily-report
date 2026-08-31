@@ -5,6 +5,7 @@ const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const TABLE = "kv_store_60b930c2";
 const KV_KEY = "laporan_harian_security";
 const LS_KEY = "riwayat_laporan_security";
+const AUTO_DRAFT_KEY = "auto_draft_laporan_security";
 
 const supabase = createClient(`https://${PROJECT_ID}.supabase.co`, ANON_KEY);
 
@@ -86,4 +87,44 @@ export async function apiDeleteLaporan(id: string): Promise<void> {
 export async function apiDeleteAll(): Promise<void> {
   lsSet([]);
   try { await sbSet([]); } catch {}
+}
+
+// ─── Auto-draft (localStorage only, silent) ──────────────────────────────────
+export function apiSaveAutoDraft(data: any): void {
+  try { localStorage.setItem(AUTO_DRAFT_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data })); } catch {}
+}
+export function apiLoadAutoDraft(): { savedAt: string; data: any } | null {
+  try { const raw = localStorage.getItem(AUTO_DRAFT_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+export function apiClearAutoDraft(): void {
+  try { localStorage.removeItem(AUTO_DRAFT_KEY); } catch {}
+}
+
+// ─── Connection test ─────────────────────────────────────────────────────────
+export type ConnectionStatus = {
+  ok: boolean;
+  latencyMs?: number;
+  error?: string;
+  tableExists?: boolean;
+  rowCount?: number;
+};
+
+export async function apiTestConnection(): Promise<ConnectionStatus> {
+  const start = Date.now();
+  try {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("key")
+      .limit(1);
+    const latencyMs = Date.now() - start;
+    if (error) {
+      return { ok: false, latencyMs, error: error.message, tableExists: false };
+    }
+    // Count rows in kv_store
+    const { data: all } = await supabase.from(TABLE).select("key");
+    const rowCount = all?.length ?? 0;
+    return { ok: true, latencyMs, tableExists: true, rowCount };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? String(e) };
+  }
 }

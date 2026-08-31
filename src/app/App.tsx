@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { apiGetLaporan, apiSaveLaporan, apiDeleteLaporan, apiDeleteAll } from "@/lib/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiGetLaporan, apiSaveLaporan, apiDeleteLaporan, apiDeleteAll, apiSaveAutoDraft, apiLoadAutoDraft, apiClearAutoDraft, apiTestConnection, type ConnectionStatus } from "@/lib/api";
 import {
   Shield, Users, Cloud, Activity, ArrowLeftRight,
   AlertTriangle, ChevronRight, Plus, Trash2, Printer,
   CheckCircle2, Clock, Sun, CloudRain, FileText,
   History, Trash, X, ChevronDown, ChevronUp, Eye,
   UserX, UserCheck, Pencil, BookOpen, Save,
+  Database, Wifi, WifiOff, RefreshCw, Loader2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1172,6 +1173,118 @@ function RiwayatModal({ onClose, onCountChange, onCetakUlang, onEdit }: { onClos
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 
+// ─── Debug Modal (cek koneksi Supabase) ──────────────────────────────────────
+
+function DebugModal({ onClose }: { onClose: () => void }) {
+  const [status, setStatus] = useState<ConnectionStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const check = useCallback(async () => {
+    setChecking(true); setStatus(null);
+    const result = await apiTestConnection();
+    setStatus(result);
+    setChecking(false);
+  }, []);
+
+  useEffect(() => { check(); }, []);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#f0f2f7]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center">
+              <Database size={16} className="text-[#1a56db]"/>
+            </div>
+            <div>
+              <p className="font-bold text-[#1a1d23] text-sm">Debug Koneksi Supabase</p>
+              <p className="text-xs text-[#9ca3af]">Cek status database</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#f4f6f9] text-[#6b7280] transition-colors"><X size={16}/></button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {/* Status card */}
+          {checking && (
+            <div className="flex flex-col items-center py-8 gap-3 text-[#9ca3af]">
+              <Loader2 size={28} className="animate-spin text-[#1a56db]"/>
+              <p className="text-sm font-medium">Menghubungi Supabase...</p>
+            </div>
+          )}
+
+          {!checking && status && (
+            <>
+              {/* Connection pill */}
+              <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ${status.ok ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                {status.ok
+                  ? <Wifi size={20} className="text-green-600 shrink-0"/>
+                  : <WifiOff size={20} className="text-red-500 shrink-0"/>}
+                <div>
+                  <p className={`font-bold text-sm ${status.ok ? "text-green-700" : "text-red-600"}`}>
+                    {status.ok ? "Terhubung ✓" : "Gagal Terhubung ✗"}
+                  </p>
+                  {status.ok && <p className="text-xs text-green-600">Latensi: {status.latencyMs} ms</p>}
+                </div>
+              </div>
+
+              {/* Detail rows */}
+              <div className="rounded-xl border border-[#edf0f5] overflow-hidden text-sm">
+                {[
+                  { label: "Project ID",     val: "gausloelinoodcppxbpa" },
+                  { label: "Tabel",          val: "kv_store_60b930c2" },
+                  { label: "Tabel ada?",     val: status.tableExists ? "✓ Ya" : "✗ Tidak", ok: status.tableExists },
+                  { label: "Jumlah row",     val: status.tableExists ? String(status.rowCount ?? 0) : "—" },
+                  { label: "Latensi",        val: status.latencyMs != null ? `${status.latencyMs} ms` : "—" },
+                ].map(r => (
+                  <div key={r.label} className="flex items-center justify-between px-4 py-2.5 border-b border-[#f4f6f9] last:border-0">
+                    <span className="text-[#6b7280] font-medium">{r.label}</span>
+                    <span className={`font-semibold ${r.ok === false ? "text-red-500" : r.ok === true ? "text-green-600" : "text-[#1a1d23]"}`}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Error detail */}
+              {status.error && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+                  <p className="text-xs font-bold text-red-600 mb-1">Pesan Error:</p>
+                  <p className="text-xs text-red-700 font-mono break-all">{status.error}</p>
+                  <div className="mt-3 text-xs text-red-600 space-y-1">
+                    <p className="font-bold">Kemungkinan penyebab:</p>
+                    <p>• Tabel <code className="bg-red-100 px-1 rounded">kv_store_60b930c2</code> belum dibuat — jalankan <code className="bg-red-100 px-1 rounded">schema.sql</code> di Supabase SQL Editor</p>
+                    <p>• RLS Policy belum aktif — pastikan policy <code className="bg-red-100 px-1 rounded">allow_all</code> untuk anon sudah ada</p>
+                    <p>• Project Supabase sedang pause / tidak aktif</p>
+                  </div>
+                </div>
+              )}
+
+              {status.ok && (
+                <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-700">
+                  <p className="font-bold mb-1">ℹ️ Info Storage:</p>
+                  <p>Data laporan disimpan sebagai JSON blob di kolom <code className="bg-blue-100 px-1 rounded">value</code> dengan key <code className="bg-blue-100 px-1 rounded">laporan_harian_security</code>.</p>
+                  <p className="mt-1">Untuk melihat data: buka Supabase → Table Editor → <code className="bg-blue-100 px-1 rounded">kv_store_60b930c2</code>.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Cek ulang button */}
+          <button
+            onClick={check}
+            disabled={checking}
+            className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#1a56db] border border-[#1a56db] px-4 py-2.5 rounded-xl hover:bg-[#eff4ff] transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={checking ? "animate-spin" : ""}/>
+            {checking ? "Mengecek..." : "Cek Ulang"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const NAV = [
   {id:"info",label:"Info Umum",icon:FileText,short:"Info"},
   {id:"personel",label:"Personel",icon:Users,short:"Personel"},
@@ -1188,10 +1301,18 @@ export default function App() {
   const [showRiwayat, setShowRiwayat]     = useState(false);
   const [showPreview, setShowPreview]     = useState(false);
   const [showDraft, setShowDraft]         = useState(false);
+  const [showDebug, setShowDebug]         = useState(false);
   const [riwayatCount, setRiwayatCount]   = useState(() => loadRiwayat().length);
   const [draftCount, setDraftCount]       = useState(() => loadDrafts().length);
   const [draftSaved, setDraftSaved]       = useState(false);
   const [printData, setPrintData]         = useState<LaporanData | null>(null);
+
+  // ─ Save-to-DB state
+  const [saveStatus, setSaveStatus]       = useState<"idle" | "saving" | "ok" | "error">("idle");
+  const [saveMsg, setSaveMsg]             = useState("");
+
+  // ─ Auto-save debounce ref
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [info, setInfoData]     = useState<Record<string,string>>({hari:"Kamis",tanggal:"",shift:"Semua Shift",salam:""});
   const [shifts, setShifts]     = useState<ShiftRow[]>(defaultShifts());
@@ -1259,12 +1380,49 @@ export default function App() {
     document.title = "Laporan Harian Security – BMW Klaten";
     // Ambil jumlah laporan dari Supabase untuk badge riwayat
     apiGetLaporan().then(data => setRiwayatCount(data.length)).catch(()=>{});
+    // Restore auto-draft jika ada
+    const autoDraft = apiLoadAutoDraft();
+    if (autoDraft) {
+      const mins = Math.round((Date.now() - new Date(autoDraft.savedAt).getTime()) / 60000);
+      const label = mins < 60 ? `${mins} menit lalu` : `${Math.round(mins/60)} jam lalu`;
+      const ok = window.confirm(`Ditemukan auto-save dari ${label}. Muat kembali?`);
+      if (ok) loadDataIntoForm(autoDraft.data);
+    }
   }, []);
+
+  // Auto-save ke localStorage setiap kali form berubah (debounce 2 detik)
+  useEffect(() => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      apiSaveAutoDraft(buildData());
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [info, shifts, libur, pimpinanHadir, pimpinanNama, cuaca, patroli, kbj, kbw, mhsw, thl, tamu, temuan, penanganan, kendala, infoTambahan]);
+
+  // Simpan langsung ke database (tanpa cetak)
+  const handleSimpanDB = async () => {
+    setSaveStatus("saving"); setSaveMsg("");
+    try {
+      const data = buildData();
+      const newItem: RiwayatItem = { id: Date.now().toString(), savedAt: new Date().toISOString(), data };
+      await apiSaveLaporan(newItem);
+      apiClearAutoDraft();
+      setRiwayatCount(c => c + 1);
+      setSaveStatus("ok");
+      setSaveMsg("Berhasil disimpan ke database!");
+    } catch (e: any) {
+      setSaveStatus("error");
+      setSaveMsg(e?.message ?? "Gagal menyimpan ke database");
+    } finally {
+      setTimeout(() => setSaveStatus("idle"), 3500);
+    }
+  };
 
   const handleCetakSekarang = async () => {
     const data = buildData();
     const newItem: RiwayatItem = { id: Date.now().toString(), savedAt: new Date().toISOString(), data };
     await apiSaveLaporan(newItem); // selalu berhasil (localStorage sebagai fallback)
+    apiClearAutoDraft();
     setRiwayatCount(c => c + 1);
     setShowPreview(false);
     const judulCetak = `Laporan Security – ${data.info.lokasi||"BMW Klaten"} – ${rangeTgl(data.info.tanggalMulai||"",data.info.tanggalAkhir||"")}`;
@@ -1309,6 +1467,33 @@ export default function App() {
               <div><p className="text-sm font-bold text-[#1a1d23] leading-tight">Laporan Harian Security</p><p className="text-xs text-[#6b7280] leading-tight">Bayer Juara{info.tanggal?` · ${formatTgl(info.tanggal)}`:""}</p></div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Auto-save indicator */}
+              <span className="hidden sm:flex items-center gap-1 text-[10px] text-[#9ca3af] font-medium select-none" title="Auto-save aktif">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"/> Auto-save
+              </span>
+              {/* Simpan ke DB */}
+              <button
+                onClick={handleSimpanDB}
+                disabled={saveStatus === "saving"}
+                className={`relative flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border transition-all ${
+                  saveStatus === "saving" ? "border-blue-300 text-blue-500 bg-blue-50 cursor-wait" :
+                  saveStatus === "ok"     ? "border-green-400 text-green-700 bg-green-50" :
+                  saveStatus === "error"  ? "border-red-400 text-red-600 bg-red-50" :
+                  "border-[#dde1ea] text-[#4b5563] hover:text-[#1a1d23] hover:bg-[#f8f9fb]"
+                }`}
+                title={saveMsg || "Simpan langsung ke database"}
+              >
+                {saveStatus === "saving" ? <Loader2 size={14} className="animate-spin"/> :
+                 saveStatus === "ok"     ? <CheckCircle2 size={14}/> :
+                 saveStatus === "error"  ? <X size={14}/> :
+                 <Database size={14}/>}
+                <span className="hidden sm:inline">
+                  {saveStatus === "saving" ? "Menyimpan..." :
+                   saveStatus === "ok"     ? "Tersimpan!" :
+                   saveStatus === "error"  ? "Gagal!" :
+                   "Simpan ke DB"}
+                </span>
+              </button>
               {/* Simpan Draft */}
               <button
                 onClick={handleSimpanDraft}
@@ -1327,6 +1512,10 @@ export default function App() {
               <button onClick={()=>setShowRiwayat(true)} className="relative flex items-center gap-2 text-sm font-medium text-[#4b5563] hover:text-[#1a1d23] border border-[#dde1ea] px-3 py-2 rounded-lg hover:bg-[#f8f9fb] transition-all">
                 <History size={15}/><span className="hidden sm:inline">Riwayat</span>
                 {riwayatCount>0&&<span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#1a56db] text-white text-[9px] font-bold rounded-full flex items-center justify-center">{riwayatCount}</span>}
+              </button>
+              {/* Debug */}
+              <button onClick={()=>setShowDebug(true)} className="flex items-center gap-1.5 text-sm font-medium text-[#4b5563] hover:text-[#1a1d23] border border-[#dde1ea] px-3 py-2 rounded-lg hover:bg-[#f8f9fb] transition-all" title="Cek koneksi Supabase">
+                <Wifi size={15}/>
               </button>
               <button onClick={()=>setShowPreview(true)} className="flex items-center gap-2 text-sm font-semibold bg-[#1a56db] text-white px-4 py-2 rounded-lg hover:bg-[#1348c0] transition-all shadow-sm">
                 <Eye size={15}/><span>Cetak & Simpan</span>
@@ -1382,6 +1571,20 @@ export default function App() {
       {showPreview&&<PreviewModal data={previewData} onClose={()=>setShowPreview(false)} onCetak={handleCetakSekarang}/>}
       {showDraft&&<DraftModal onClose={()=>setShowDraft(false)} onLoad={handleLoadDraft} onCountChange={setDraftCount}/>}
       {showRiwayat&&<RiwayatModal onClose={()=>setShowRiwayat(false)} onCountChange={setRiwayatCount} onCetakUlang={handleCetakUlang} onEdit={handleEditRiwayat}/>}
+      {showDebug&&<DebugModal onClose={()=>setShowDebug(false)}/>}
+      {/* Save-to-DB toast */}
+      {saveStatus !== "idle" && (
+        <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold transition-all ${
+          saveStatus === "saving" ? "bg-blue-600 text-white" :
+          saveStatus === "ok"     ? "bg-green-600 text-white" :
+          "bg-red-600 text-white"
+        }`}>
+          {saveStatus === "saving" && <Loader2 size={16} className="animate-spin"/>}
+          {saveStatus === "ok"     && <CheckCircle2 size={16}/>}
+          {saveStatus === "error"  && <WifiOff size={16}/>}
+          {saveMsg || (saveStatus === "saving" ? "Menyimpan ke database..." : "")}
+        </div>
+      )}
     </div>
   );
 }
