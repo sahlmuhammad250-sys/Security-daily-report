@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { apiGetLaporan, apiSaveLaporan, apiDeleteLaporan, apiDeleteAll, apiSaveAutoDraft, apiLoadAutoDraft, apiClearAutoDraft, apiTestConnection, apiGetMasterThl, apiSaveMasterThl, type ConnectionStatus } from "@/lib/api";
+import { apiGetLaporan, apiSaveLaporan, apiDeleteLaporan, apiDeleteAll, apiSaveAutoDraft, apiLoadAutoDraft, apiClearAutoDraft, apiTestConnection, type ConnectionStatus } from "@/lib/api";
 import {
   Shield, Users, Cloud, Activity, ArrowLeftRight,
   AlertTriangle, ChevronRight, Plus, Trash2, Printer,
@@ -1427,12 +1427,6 @@ export default function App() {
       const ok = window.confirm(`Ditemukan auto-save dari ${label}. Muat kembali?`);
       if (ok) loadDataIntoForm(autoDraft.data);
     }
-    // Ambil master THL dari Supabase
-    apiGetMasterThl().then(names => {
-      if (names && names.length > 0) {
-        setThl(names.map(nama => ({ id: uid(), nama, jamMasuk: "07:00", jamKeluar: "15:00" })));
-      }
-    }).catch(() => {});
   }, []);
 
   // Auto-save ke localStorage setiap kali form berubah (debounce 2 detik)

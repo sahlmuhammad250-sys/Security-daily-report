@@ -112,43 +112,13 @@ export function apiClearAutoDraft(): void {
   try { localStorage.removeItem(AUTO_DRAFT_KEY); } catch {}
 }
 
-// ─── Master THL API ──────────────────────────────────────────────────────────
+// ─── Master THL API (Statis) ──────────────────────────────────────────────────
 export async function apiGetMasterThl(): Promise<string[]> {
-  let localNames: string[] = [];
-  try {
-    const raw = localStorage.getItem(LS_THL_KEY);
-    if (raw) localNames = JSON.parse(raw);
-  } catch {}
-
-  try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select("value")
-      .eq("key", MASTER_THL_KEY)
-      .maybeSingle();
-
-    if (!error && data?.value && Array.isArray(data.value) && data.value.length > 0) {
-      const names = data.value as string[];
-      try { localStorage.setItem(LS_THL_KEY, JSON.stringify(names)); } catch {}
-      return names;
-    }
-  } catch {}
-
-  if (localNames.length > 0) return localNames;
-
-  // Fallback ke default 34 nama
-  try { localStorage.setItem(LS_THL_KEY, JSON.stringify(DEFAULT_THL_NAMES)); } catch {}
-  try {
-    await supabase.from(TABLE).upsert({ key: MASTER_THL_KEY, value: DEFAULT_THL_NAMES });
-  } catch {}
   return DEFAULT_THL_NAMES;
 }
 
-export async function apiSaveMasterThl(names: string[]): Promise<void> {
-  try { localStorage.setItem(LS_THL_KEY, JSON.stringify(names)); } catch {}
-  try {
-    await supabase.from(TABLE).upsert({ key: MASTER_THL_KEY, value: names });
-  } catch {}
+export async function apiSaveMasterThl(_names: string[]): Promise<void> {
+  // Master THL sudah statis dalam kode
 }
 
 
