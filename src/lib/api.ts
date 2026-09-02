@@ -5,7 +5,18 @@ const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const TABLE = "kv_store_60b930c2";
 const KV_KEY = "laporan_harian_security";
 const LS_KEY = "riwayat_laporan_security";
-const AUTO_DRAFT_KEY = "auto_draft_laporan_security";
+const MASTER_THL_KEY = "master_thl_names";
+const LS_THL_KEY = "master_thl_names_local";
+
+export const DEFAULT_THL_NAMES = [
+  "Nur Hayadi", "Sri Tukul", "Wiyanto", "Umar Marjuki", "Ubayah Muhammadi",
+  "Asat Thohir", "Aditya Admana", "Sugeng Purwanto", "Fahrizal FH", "Sadewa",
+  "Ragil Imam Waluyo", "Sri Maryanto", "Abdul Anggit M", "Kasmi", "Sapriyah",
+  "Jumadi", "Erni Widayanti", "Kurhan Muhksinin", "Galuh Hismawah", "Rizal Bagus Sasongko",
+  "Abid Dhaifullah", "Ramadhon", "Wahyu Hidayat", "Ihksan Fakih", "Riyan",
+  "Nasrul Syarifudin", "Safakur Usman Ridho", "Ervan Bagus Haryadi", "Sigit Budi Santoso",
+  "Andika Indra Tyasa", "Joko Wiyono", "Oky Sujatmiko", "Afrizal Rehan Kurnianto", "Dimas Hermawan",
+];
 
 const supabase = createClient(`https://${PROJECT_ID}.supabase.co`, ANON_KEY);
 
@@ -99,6 +110,46 @@ export function apiLoadAutoDraft(): { savedAt: string; data: any } | null {
 export function apiClearAutoDraft(): void {
   try { localStorage.removeItem(AUTO_DRAFT_KEY); } catch {}
 }
+
+// ─── Master THL API ──────────────────────────────────────────────────────────
+export async function apiGetMasterThl(): Promise<string[]> {
+  let localNames: string[] = [];
+  try {
+    const raw = localStorage.getItem(LS_THL_KEY);
+    if (raw) localNames = JSON.parse(raw);
+  } catch {}
+
+  try {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("value")
+      .eq("key", MASTER_THL_KEY)
+      .maybeSingle();
+
+    if (!error && data?.value && Array.isArray(data.value) && data.value.length > 0) {
+      const names = data.value as string[];
+      try { localStorage.setItem(LS_THL_KEY, JSON.stringify(names)); } catch {}
+      return names;
+    }
+  } catch {}
+
+  if (localNames.length > 0) return localNames;
+
+  // Fallback ke default 34 nama
+  try { localStorage.setItem(LS_THL_KEY, JSON.stringify(DEFAULT_THL_NAMES)); } catch {}
+  try {
+    await supabase.from(TABLE).upsert({ key: MASTER_THL_KEY, value: DEFAULT_THL_NAMES });
+  } catch {}
+  return DEFAULT_THL_NAMES;
+}
+
+export async function apiSaveMasterThl(names: string[]): Promise<void> {
+  try { localStorage.setItem(LS_THL_KEY, JSON.stringify(names)); } catch {}
+  try {
+    await supabase.from(TABLE).upsert({ key: MASTER_THL_KEY, value: names });
+  } catch {}
+}
+
 
 // ─── Connection test ─────────────────────────────────────────────────────────
 export type ConnectionStatus = {
