@@ -108,7 +108,7 @@ function SCard({ title, icon, count, children, accent }: { title:string; icon:Re
     </div>
   );
 }
-function Th({ children, w }: { children:React.ReactNode; w?:string }) {
+function Th({ children, w }: { children?:React.ReactNode; w?:string }) {
   return <th className={`text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wider px-3 py-2.5 bg-[#f8f9fb] border-b border-[#edf0f5] whitespace-nowrap ${w??""}`}>{children}</th>;
 }
 function Td({ children }: { children:React.ReactNode }) { return <td className="px-3 py-2 border-b border-[#f4f6f9] align-middle">{children}</td>; }
@@ -382,11 +382,22 @@ function SeksiAktivitas({ rows, setRows }: { rows:PatroliRow[]; setRows:(r:Patro
   );
 }
 
-function KaryawanTable({ title, rows, setRows }: { title:string; rows:KaryawanRow[]; setRows:(r:KaryawanRow[])=>void }) {
+function KaryawanTable({ title, rows, setRows, onResetDefault }: { title:string; rows:KaryawanRow[]; setRows:(r:KaryawanRow[])=>void; onResetDefault?:()=>void }) {
   const upd = (id:number,k:keyof KaryawanRow,v:string) => setRows(rows.map(x=>x.id===id?{...x,[k]:v}:x));
   return (
     <div>
-      <p className="text-sm font-semibold text-[#374151] mb-2">{title} <span className="text-xs font-normal text-[#9ca3af]">({rows.length} orang)</span></p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold text-[#374151]">{title} <span className="text-xs font-normal text-[#9ca3af]">({rows.length} orang)</span></p>
+        {onResetDefault && (
+          <button
+            onClick={onResetDefault}
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#1a56db] hover:text-[#1348c0] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-colors"
+            title="Muat 34 Nama THL Standar"
+          >
+            <RefreshCw size={13}/> Muat 34 Nama THL Default
+          </button>
+        )}
+      </div>
       <div className="overflow-x-auto rounded-lg border border-[#edf0f5]">
         <table className="w-full text-sm"><thead><tr>
           <Th w="w-8">No</Th><Th>Nama</Th><Th w="w-36">Jam Masuk</Th><Th w="w-36">Jam Keluar</Th><Th w="w-10"></Th>
@@ -400,10 +411,38 @@ function KaryawanTable({ title, rows, setRows }: { title:string; rows:KaryawanRo
               <Td><BtnDel onClick={()=>setRows(rows.filter(x=>x.id!==r.id))}/></Td>
             </tr>
           ))}
-          {rows.length===0&&<EmptyRow cols={5} msg="Belum ada data"/>}
+          {rows.length===0&&(
+            <tr>
+              <td colSpan={5} className="text-center py-6">
+                <p className="text-sm text-[#9ca3af] mb-2">Belum ada data</p>
+                {onResetDefault && (
+                  <button
+                    onClick={onResetDefault}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1a56db] hover:bg-[#1348c0] px-3 py-1.5 rounded-lg shadow-sm transition-colors"
+                  >
+                    <RefreshCw size={13}/> Muat 34 Nama THL Default
+                  </button>
+                )}
+              </td>
+            </tr>
+          )}
         </tbody></table>
       </div>
-      <BtnAdd onClick={()=>setRows([...rows,mkKaryawan()])} label="Tambah Orang"/>
+      <div className="flex items-center justify-between mt-3">
+        <BtnAdd onClick={()=>setRows([...rows,mkKaryawan()])} label="Tambah Orang"/>
+        {onResetDefault && rows.length > 0 && (
+          <button
+            onClick={() => {
+              if (window.confirm("Apakah Anda yakin ingin menghapus semua baris THL?")) {
+                setRows([]);
+              }
+            }}
+            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+          >
+            Kosongkan Daftar THL
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -426,7 +465,7 @@ function SeksiKelMasuk({ kbj,setKbj,kbw,setKbw,mhsw,setMhsw,thl,setThl,tamu,setT
         <div className="border-t border-[#f0f2f7]"/>
         <KaryawanTable title="Mahasiswa Magang" rows={mhsw} setRows={setMhsw}/>
         <div className="border-t border-[#f0f2f7]"/>
-        <KaryawanTable title="Pekerja THL" rows={thl} setRows={setThl}/>
+        <KaryawanTable title="Pekerja THL" rows={thl} setRows={setThl} onResetDefault={() => setThl(defaultThl())}/>
         <div className="border-t border-[#f0f2f7]"/>
         <div>
           <p className="text-sm font-semibold text-[#374151] mb-2">Tamu Bayer Juara <span className="text-xs font-normal text-[#9ca3af]">({tamu.length} tamu)</span></p>
@@ -1344,7 +1383,7 @@ export default function App() {
     setKbj(d.kbj ?? []);
     setKbw(d.kbw ?? []);
     setMhsw(d.mhsw ?? []);
-    setThl(d.thl ?? []);
+    setThl(d.thl?.length ? d.thl : defaultThl());
     setTamu(d.tamu ?? []);
     setTemuan(d.temuan ?? []);
     setPenanganan(d.penanganan ?? "");
@@ -1431,7 +1470,7 @@ export default function App() {
     apiClearAutoDraft();
     setRiwayatCount(c => c + 1);
     setShowPreview(false);
-    const judulCetak = `Laporan Security – ${data.info.lokasi||"BMW Klaten"} – ${rangeTgl(data.info.tanggalMulai||"",data.info.tanggalAkhir||"")}`;
+    const judulCetak = `Laporan Security – ${data.info.lokasi||"BMW Klaten"} – ${formatTgl(data.info.tanggal||"")}`;
     document.title = judulCetak;
     setTimeout(() => {
       window.print();

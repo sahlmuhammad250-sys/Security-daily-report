@@ -7,6 +7,7 @@ const KV_KEY = "laporan_harian_security";
 const LS_KEY = "riwayat_laporan_security";
 const MASTER_THL_KEY = "master_thl_names";
 const LS_THL_KEY = "master_thl_names_local";
+const AUTO_DRAFT_KEY = "auto_draft_laporan_security";
 
 export const DEFAULT_THL_NAMES = [
   "Nur Hayadi", "Sri Tukul", "Wiyanto", "Umar Marjuki", "Ubayah Muhammadi",
